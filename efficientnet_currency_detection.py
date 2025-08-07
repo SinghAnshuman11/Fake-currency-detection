@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import time
+from sklearn.metrics import classification_report
 import argparse
 
 # --- 1. Configuration and Hyperparameters ---
@@ -160,6 +161,35 @@ def train_model():
     print(f'Best val Acc: {best_val_accuracy:4f}')
 
 # --- 6. Testing/Inference ---
+
+def evaluate_model():
+    """Loads the best model and evaluates it on the validation set."""
+    if not os.path.exists(MODEL_SAVE_PATH):
+        print(f"Model file not found at {MODEL_SAVE_PATH}. Please train the model first.")
+        return
+
+    print("\n--- Evaluating model on validation set ---")
+    # Load the best model for evaluation
+    model = create_finetune_model(NUM_CLASSES, weights_enum=None)
+    model.load_state_dict(torch.load(MODEL_SAVE_PATH))
+    model = model.to(DEVICE)
+    model.eval()
+
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():
+        for inputs, labels in validation_loader:
+            inputs = inputs.to(DEVICE)
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, 1)
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+
+    print("\nClassification Report:")
+    report = classification_report(all_labels, all_preds, target_names=CLASS_LIST, digits=4)
+    print(report)
+
 def test_single_image(image_path):
     if not os.path.exists(MODEL_SAVE_PATH):
         print(f"Model file not found at {MODEL_SAVE_PATH}. Please train the model first.")
@@ -199,6 +229,7 @@ if __name__ == '__main__':
     # --- 7. Command-Line Interface ---
     parser = argparse.ArgumentParser(description='Fake Currency Detection with EfficientNet.')
     parser.add_argument('--train', action='store_true', help='Flag to train the model.')
+    parser.add_argument('--evaluate', action='store_true', help='Flag to evaluate the model on the validation set.')
     parser.add_argument('--test', type=str, metavar='PATH', help='Flag to test a single image. Provide the image path.')
 
     args = parser.parse_args()
@@ -206,8 +237,10 @@ if __name__ == '__main__':
     if args.train:
         print("--- Starting Model Training ---")
         train_model()
+    elif args.evaluate:
+        evaluate_model()
     elif args.test:
         print(f"--- Testing single image: {args.test} ---")
         test_single_image(image_path=args.test)
     else:
-        print("No action specified. Please use --train to train or --test <path_to_image> to test.")
+        print("No action specified. Please use --train, --evaluate, or --test <path_to_image>.")
