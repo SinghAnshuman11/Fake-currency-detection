@@ -212,3 +212,4 @@ __marimo__/
 *.pth
 dataset/
 training_history_plot.png
+confusion_matrix.png
